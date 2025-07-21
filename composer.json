@@ -1,0 +1,14 @@
+    {
+        "name": "seu-usuario/sistema-chamados",
+        "description": "Sistema de gerenciamento de chamados via e-mail.",
+        "require": {
+            "php": ">=7.4",
+            "phpmailer/phpmailer": "^6.9"
+        },
+        "autoload": {
+            "psr-4": {
+                "App\\": "src/"
+            }
+        }
+    }
+    
