@@ -54,7 +54,7 @@ if (!isset($_SESSION['usuario_role']) || $_SESSION['usuario_role'] !== 'admin') 
             <a href="index.php" class="btn btn-secondary"><i class="bi bi-arrow-left-circle me-1"></i> Voltar para Chamados</a>
         </div>
 
-        <div class="row row-cols-1 row-cols-md-3 g-4">
+        <div class="row row-cols-1 row-cols-md-4 g-4">
             <div class="col">
                 <a href="reports_status.php" class="report-card-link">
                     <div class="card h-100">
@@ -110,6 +110,17 @@ if (!isset($_SESSION['usuario_role']) || $_SESSION['usuario_role'] !== 'admin') 
                     </div>
                 </a>
             </div>
+            <div class="col">
+    <a href="reports_agent_time.php" class="report-card-link">
+        <div class="card h-100">
+            <div class="card-body">
+                <i class="bi bi-speedometer2"></i>
+                <h5 class="card-title">Desempenho por Atendente</h5>
+                <p class="card-text text-muted">Tempo médio de resolução dos chamados para cada atendente.</p>
+            </div>
+        </div>
+    </a>
+</div>
             <div class="col">
                 <a href="reports_priority.php" class="report-card-link">
                     <div class="card h-100">

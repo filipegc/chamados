@@ -534,7 +534,7 @@ function formatBytes($bytes, $precision = 2) {
     'insertdatetime', 'media', 'table', 'help', 'wordcount'
      // REMOVIDOS: 'powerpaste', 'casechange', 'export'
   ],
-        toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table | align lineheight | numlist bullist indent outdent | emoticons charmap | removeformat',
+        toolbar: 'fullscreen |undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table | align lineheight | numlist bullist indent outdent | emoticons charmap | removeformat  ',
         setup: function (editor) {
             editor.on('init', function (e) {
                 // Se não houver conteúdo ou se for a primeira carga, adicione a assinatura

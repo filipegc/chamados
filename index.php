@@ -19,6 +19,14 @@ $is_searching = !empty($search_query);
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * RESULTS_PER_PAGE;
 
+
+// ADICIONE ESTAS LINHAS
+$start_date = isset($_GET['start_date']) ? $_GET['start_date'] : '';
+$end_date = isset($_GET['end_date']) ? $_GET['end_date'] : '';
+
+// Atualiza a flag is_searching para incluir as datas
+$is_searching = !empty($search_query) || !empty($start_date) || !empty($end_date);
+
 $selected_category_id = isset($_GET['category_id']) && is_numeric($_GET['category_id']) ? (int)$_GET['category_id'] : null;
 if (isset($_GET['category_id']) && $_GET['category_id'] === '') {
     $selected_category_id = null;
@@ -84,11 +92,12 @@ function render_pagination($current_page, $total_pages, $base_params) {
     echo '</ul></nav>';
 }
 
-function get_filtered_query_parts($view_mode, $current_user_id, $status = null, $search_query = '', $category_id = null) {
+function get_filtered_query_parts($view_mode, $current_user_id, $status = null, $search_query = '', $category_id = null, $start_date = '', $end_date = '') {
     $sql_where = '';
     $params = [];
     $types = '';
     $conditions = [];
+
     if ($status) {
         $conditions[] = "c.status = ?";
         $types .= 's';
@@ -110,6 +119,18 @@ function get_filtered_query_parts($view_mode, $current_user_id, $status = null, 
         $types .= 'sss';
         array_push($params, $like_plain, $like_plain, $like_plain);
     }
+    // LÓGICA DE DATAS ADICIONADA
+    if (!empty($start_date)) {
+        $conditions[] = "c.data_criacao >= ?";
+        $types .= 's';
+        $params[] = $start_date . ' 00:00:00';
+    }
+    if (!empty($end_date)) {
+        $conditions[] = "c.data_criacao <= ?";
+        $types .= 's';
+        $params[] = $end_date . ' 23:59:59';
+    }
+    
     if (!empty($conditions)) {
         $sql_where = " WHERE " . implode(' AND ', $conditions);
     }
@@ -173,14 +194,29 @@ function get_base_query() {
             <div class="card-body">
                 <div class="row align-items-center mb-3 g-3">
                     <div class="col-md-7 col-lg-8">
-                        <form action="index.php" method="GET" class="d-flex">
-                            <input type="hidden" name="view" value="<?php echo htmlspecialchars($view_mode); ?>">
-                            <input type="text" class="form-control me-2 rounded-pill" name="q" placeholder="Buscar por assunto, e-mail..." value="<?php echo htmlspecialchars($search_query); ?>">
-                            <button type="submit" class="btn btn-success rounded-pill"><i class="bi bi-search"></i></button>
-                            <?php if ($is_searching): ?>
-                                <a href="index.php?view=<?php echo htmlspecialchars($view_mode); ?>" class="btn btn-outline-secondary ms-2 rounded-pill"><i class="bi bi-x-lg"></i> Limpar</a>
-                            <?php endif; ?>
-                        </form>
+                        <form action="index.php" method="GET" class="row g-3 align-items-center">
+    <div class="col-md-5">
+        <input type="text" class="form-control rounded-pill" name="q" placeholder="Buscar por assunto, e-mail..." value="<?php echo htmlspecialchars($search_query); ?>">
+    </div>
+    <div class="col-md-3">
+        <input type="date" class="form-control" name="start_date" title="Data Inicial" value="<?php echo htmlspecialchars($start_date); ?>">
+    </div>
+    <div class="col-md-3">
+        <input type="date" class="form-control" name="end_date" title="Data Final" value="<?php echo htmlspecialchars($end_date); ?>">
+    </div>
+    <div class="col-md-1">
+        <button type="submit" class="btn btn-success rounded-pill w-100"><i class="bi bi-search"></i></button>
+    </div>
+
+    <input type="hidden" name="view" value="<?php echo htmlspecialchars($view_mode); ?>">
+    <input type="hidden" name="category_id" value="<?php echo htmlspecialchars($selected_category_id ?? ''); ?>">
+
+    <?php if ($is_searching): ?>
+        <div class="col-12 text-center mt-2">
+             <a href="index.php?view=<?php echo htmlspecialchars($view_mode); ?>" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-x-lg"></i> Limpar todos os filtros</a>
+        </div>
+    <?php endif; ?>
+</form>
                     </div>
                     <div class="col-md-5 col-lg-4 text-end d-flex justify-content-end align-items-center">
                         <div class="btn-group" role="group">
@@ -242,7 +278,7 @@ function get_base_query() {
                         <thead><tr><th>ID</th><th>Status</th><th>Prioridade</th><th>Atribuído a</th><th class="text-center">Msgs</th><th>Assunto</th><th>Cliente</th><th>Categoria</th><th>Chegada</th><th class="text-center">1ª Resp.</th></tr></thead>
                         <tbody>
                             <?php
-                            $query_parts = get_filtered_query_parts($view_mode, $current_user_id, null, $search_query, $selected_category_id);
+                            $query_parts = get_filtered_query_parts($view_mode, $current_user_id, null, $search_query, $selected_category_id, $start_date, $end_date);
                             $count_sql = "SELECT COUNT(DISTINCT c.id) as total FROM chamados c LEFT JOIN mensagens m ON c.id = m.chamado_id " . $query_parts['where'];
                             $stmt_count = $conn->prepare($count_sql);
                             if (!empty($query_parts['types'])) $stmt_count->bind_param($query_parts['types'], ...$query_parts['params']);
@@ -270,7 +306,7 @@ function get_base_query() {
                 $active_tab_from_get = $_GET['tab'] ?? 'aberto';
                 foreach (['Aberto', 'Pendente', 'Fechado'] as $status):
                     $is_active_tab = (strtolower($status) === $active_tab_from_get);
-                    $query_parts_count = get_filtered_query_parts($view_mode, $current_user_id, $status, '', $selected_category_id);
+                    $query_parts_count = get_filtered_query_parts($view_mode, $current_user_id, $status, '', $selected_category_id, $start_date, $end_date);
                     $count_sql = "SELECT COUNT(DISTINCT c.id) as total FROM chamados c " . $query_parts_count['where'];
                     $stmt_count = $conn->prepare($count_sql);
                     if (!empty($query_parts_count['types'])) $stmt_count->bind_param($query_parts_count['types'], ...$query_parts_count['params']);
@@ -299,7 +335,7 @@ function get_base_query() {
                                         // CORRIGIDO: A condição "if ($is_active_tab)" foi removida daqui.
                                         // Agora, o PHP vai montar a tabela para TODAS as abas.
                                         
-                                            $query_parts = get_filtered_query_parts($view_mode, $current_user_id, $status, '', $selected_category_id);
+                                           $query_parts = get_filtered_query_parts($view_mode, $current_user_id, $status, '', $selected_category_id, $start_date, $end_date);
                                         
                                         // A contagem já foi feita para as abas, podemos reutilizar o resultado se quisermos
                                         $count_sql_pane = "SELECT COUNT(DISTINCT c.id) as total FROM chamados c " . $query_parts['where'];
@@ -335,105 +371,79 @@ function get_base_query() {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     
-    // Função para escapar HTML e evitar XSS
+    // Função para escapar HTML e evitar ataques (Cross-Site Scripting)
     function escapeHtml(text) {
-        if (text === null || text === undefined) {
-            return '';
-        }
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
+        if (text === null || text === undefined) return '';
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
         return text.toString().replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
-    // Função que processa os dados de novos chamados e atualiza a tabela
+    // Função dedicada para processar novos chamados e atualizar a tabela
     function processNewTickets(newTickets) {
         if (newTickets && newTickets.length > 0) {
+            console.log('Recebidos ' + newTickets.length + ' novos chamados. Atualizando a interface...');
+            
             newTickets.reverse().forEach(ticket => {
-                const existingRow = document.querySelector(`[data-ticket-id='${ticket.id}']`);
+                const existingRow = document.querySelector(`tr[data-ticket-id='${ticket.id}']`);
 
                 if (existingRow) {
-                    // Lógica para atualizar uma linha que já existe (se necessário)
-                    // Por enquanto, vamos focar na criação de novas linhas
-                } else {
-                    // Lógica para criar uma nova linha na aba correta
-                    const ticketStatusPaneId = `${ticket.status.toLowerCase()}-pane`;
-                    const targetPane = document.getElementById(ticketStatusPaneId);
+                    existingRow.classList.add('table-info');
+                    return;
+                }
+                
+                const ticketStatusPaneId = `${ticket.status.toLowerCase()}-pane`;
+                const targetPane = document.getElementById(ticketStatusPaneId);
 
-                    if (targetPane) {
-                        const targetTbody = targetPane.querySelector('tbody');
-                        const noTicketsRow = targetTbody.querySelector('.no-tickets-row');
-                        if (noTicketsRow) noTicketsRow.remove();
-                        
-                        const newRow = document.createElement('tr');
-                        newRow.dataset.ticketId = ticket.id;
-                        newRow.className = 'table-info'; // Destaca a nova linha
-                        newRow.style.cursor = 'pointer';
-                        newRow.onclick = function() { window.location='view_ticket.php?id=' + ticket.id; };
-                        
-                        // Popula a linha com os dados completos recebidos
-                        newRow.innerHTML = `
-                            <td>#${ticket.id} <span class="badge bg-primary">Novo</span></td>
-                            <td><span class="badge rounded-pill status-${ticket.status.toLowerCase()}">${escapeHtml(ticket.status)}</span></td>
-                            <td><span class="badge prioridade-${ticket.prioridade.toLowerCase()}">${escapeHtml(ticket.prioridade)}</span></td>
-                            <td>${escapeHtml(ticket.nome_usuario || 'N/A')}</td>
-                            <td class="text-center"><span class="badge bg-secondary">${ticket.message_count}</span></td>
-                            <td>${escapeHtml(ticket.assunto)}</td>
-                            <td>${escapeHtml(ticket.email_cliente)}</td>
-                            <td>${escapeHtml(ticket.nome_categoria || 'N/A')}</td>
-                            <td>${new Date(ticket.data_criacao).toLocaleString('pt-BR')}</td>
-                            <td class="text-center">-</td>`;
-                        
-                        targetTbody.prepend(newRow); // Adiciona no topo da tabela
+                if (targetPane) {
+                    const targetTbody = targetPane.querySelector('tbody');
+                    const noTicketsRow = targetTbody.querySelector('.no-tickets-row');
+                    if (noTicketsRow) noTicketsRow.remove();
+                    
+                    const newRow = document.createElement('tr');
+                    newRow.dataset.ticketId = ticket.id;
+                    newRow.className = 'table-info';
+                    newRow.style.cursor = 'pointer';
+                    
+                    newRow.innerHTML = `
+                        <td>#${ticket.id} <span class="badge bg-primary">Novo</span></td>
+                        <td><span class="badge rounded-pill status-${ticket.status.toLowerCase()}">${escapeHtml(ticket.status)}</span></td>
+                        <td><span class="badge prioridade-${ticket.prioridade.toLowerCase()}">${escapeHtml(ticket.prioridade)}</span></td>
+                        <td>${escapeHtml(ticket.nome_usuario || 'N/A')}</td>
+                        <td class="text-center"><span class="badge bg-secondary">${ticket.message_count}</span></td>
+                        <td>${escapeHtml(ticket.assunto)}</td>
+                        <td>${escapeHtml(ticket.email_cliente)}</td>
+                        <td>${escapeHtml(ticket.nome_categoria || 'N/A')}</td>
+                        <td>${new Date(ticket.data_criacao).toLocaleString('pt-BR')}</td>
+                        <td class="text-center">${escapeHtml(ticket.first_reply_diff || '-')}</td>`;
+                    
+                    targetTbody.prepend(newRow);
 
-                        // Atualiza o contador na aba de status
-                        const tabButton = document.getElementById(`${ticket.status.toLowerCase()}-tab`);
-                        if (tabButton) {
-                            const badge = tabButton.querySelector('.badge');
-                            if (badge) badge.textContent = parseInt(badge.textContent) + 1;
-                        }
+                    const tabButton = document.getElementById(`${ticket.status.toLowerCase()}-tab`);
+                    if (tabButton) {
+                        const badge = tabButton.querySelector('.badge');
+                        if (badge) badge.textContent = parseInt(badge.textContent) + 1;
                     }
                 }
             });
         }
     }
 
-    // --- LÓGICA DE ATUALIZAÇÃO DA TABELA (AJAX) ---
-    // Esta função agora serve para atualizações de status, etc., mas não para novos e-mails.
-    function fetchUpdates() {
-        // ... (seu código de fetchUpdates pode continuar o mesmo, pois é útil para outras atualizações) ...
-        // Por segurança, vamos mantê-lo como está.
-        const activeTabPane = document.querySelector('#statusTabsContent .tab-pane.active');
-        if (!activeTabPane) return;
-        const activeTbody = activeTabPane.querySelector('tbody');
-        if (!activeTbody) return;
-        
-        let lastId = 0; // Esta lógica pode precisar de revisão, mas vamos focar no bug principal
-        document.querySelectorAll('tr[data-ticket-id]').forEach(row => {
-            const currentId = parseInt(row.dataset.ticketId);
-            if (currentId > lastId) lastId = currentId;
-        });
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const viewMode = urlParams.get('view') || 'all';
-        const categoryId = urlParams.get('category_id') || '';
-
-        fetch(`get_updates_ajax.php?last_id=${lastId}&view=${viewMode}&category_id=${categoryId}`)
-            .then(response => response.json())
-            .then(updatedTickets => {
-                if (updatedTickets.length > 0) {
-                    // A sua lógica de atualização de linhas existentes pode ser chamada aqui
-                    console.log('Atualizações de status recebidas:', updatedTickets);
+    // Lógica para cliques na tabela (centralizada e eficiente)
+    const statusTabsContent = document.getElementById('statusTabsContent');
+    if (statusTabsContent) {
+        statusTabsContent.addEventListener('click', function(event) {
+            const clickedRow = event.target.closest('tr');
+            if (clickedRow && clickedRow.dataset.ticketId) {
+                const ticketId = clickedRow.dataset.ticketId;
+                if (clickedRow.classList.contains('table-info')) {
+                    clickedRow.classList.remove('table-info');
                 }
-            })
-            .catch(error => console.error('Erro ao buscar atualizações de status:', error));
+                window.location.href = 'view_ticket.php?id=' + ticketId;
+            }
+        });
     }
 
-    // --- LÓGICA DO RELÓGIO E VERIFICAÇÃO DE E-MAILS EM SEGUNDO PLANO ---
+    // --- LÓGICA DO RELÓGIO E VERIFICAÇÃO DE E-MAILS ---
     const fetchButton = document.getElementById('email-action-btn');
     const timerDisplay = document.getElementById('fetch-timer');
     const pauseResumeBtn = document.getElementById('pause-resume-btn');
@@ -447,7 +457,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let fetchIntervalId;
     let timerIntervalId;
 
-    // ESTA É A FUNÇÃO PRINCIPAL CORRIGIDA
+    // Função que busca novos e-mails e chama a função de processamento
     function triggerEmailFetch() {
         if (isFetchingEmails || isPaused) return;
         isFetchingEmails = true;
@@ -459,8 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('scripts/fetch_emails.php?source=ajax')
             .then(response => response.json())
             .then(data => {
-                // AGORA USAMOS A FUNÇÃO DE PROCESSAMENTO COM OS DADOS VINDOS DIRETAMENTE DAQUI
-                processNewTickets(data.new_tickets);
+                processNewTickets(data.new_tickets); // A mágica acontece aqui!
             })
             .catch(error => console.error("Erro na busca de e-mails:", error))
             .finally(() => {
@@ -469,19 +478,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     fetchButton.innerHTML = '<i class="bi bi-envelope"></i> E-mails';
                     fetchButton.classList.remove('disabled');
                 }
-                // A CHAMADA PARA fetchUpdates() FOI REMOVIDA DAQUI
             });
     }
 
+    // --- Funções do Timer e Controles ---
     function updateTimer() {
-        if (isPaused) {
-            timerDisplay.innerHTML = `<i class="bi bi-pause-circle"></i> Pausado`;
-            return;
-        }
-        if (isFetchingEmails) {
-            timerDisplay.innerHTML = `<i class="bi bi-arrow-repeat"></i> Em execução...`;
-            return;
-        }
+        if (isPaused) { timerDisplay.innerHTML = `<i class="bi bi-pause-circle"></i> Pausado`; return; }
+        if (isFetchingEmails) { timerDisplay.innerHTML = `<i class="bi bi-arrow-repeat"></i> Em execução...`; return; }
         countdown--;
         if (countdown < 0) {
             triggerEmailFetch();
@@ -498,8 +501,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function startTimers() {
         isPaused = false;
         pauseResumeBtn.innerHTML = '<i class="bi bi-pause-fill"></i>';
-        
-        setTimeout(triggerEmailFetch, 5000);
+        setTimeout(triggerEmailFetch, 5000); // Primeira verificação após 5s
         fetchIntervalId = setInterval(triggerEmailFetch, fetchIntervalMilliseconds);
         timerIntervalId = setInterval(updateTimer, 1000);
         updateTimer();
@@ -508,24 +510,17 @@ document.addEventListener('DOMContentLoaded', function() {
     function stopTimers() {
         isPaused = true;
         pauseResumeBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-        
         clearInterval(fetchIntervalId);
         clearInterval(timerIntervalId);
         updateTimer();
     }
 
     pauseResumeBtn.addEventListener('click', function() {
-        if (isPaused) {
-            startTimers();
-        } else {
-            stopTimers();
-        }
+        if (isPaused) { startTimers(); } else { stopTimers(); }
     });
 
-    // --- INICIALIZAÇÃO DOS PROCESSOS AUTOMÁTICOS ---
-    setInterval(fetchUpdates, 15000); // Atualização da tabela (para status etc) continua independente
-    startTimers(); // Inicia a automação de busca de e-mails e o relógio
-
+    // Inicia a automação
+    startTimers();
 });
 </script>
 </body>

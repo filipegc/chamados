@@ -123,7 +123,7 @@ if (isset($_SESSION['usuario_id'])) {
             'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
             'insertdatetime', 'media', 'table', 'help', 'wordcount'
         ],
-        toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table | align lineheight | numlist bullist indent outdent | emoticons charmap | removeformat',
+        toolbar: 'fullscreen | undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table | align lineheight | numlist bullist indent outdent | emoticons charmap | removeformat',
         
         // Remove a borda "Powered by Tiny"
         branding: false, 
