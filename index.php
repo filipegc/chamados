@@ -443,6 +443,58 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+
+// Função dedicada para processar ATUALIZAÇÕES em chamados existentes
+    function processTicketUpdates(updatedTickets) {
+        if (updatedTickets && updatedTickets.length > 0) {
+            console.log('Recebidas ' + updatedTickets.length + ' atualizações de chamados.');
+
+            updatedTickets.forEach(ticket => {
+                const existingRow = document.querySelector(`tr[data-ticket-id='${ticket.id}']`);
+
+                // Se a linha do chamado estiver visível na tela
+                if (existingRow) {
+                    console.log(`Atualizando a linha para o chamado #${ticket.id}`);
+
+                    // 1. Adiciona um destaque visual
+                    existingRow.classList.add('table-info');
+                    
+                    // 2. Adiciona um badge de "Nova Resposta" se ainda não existir
+                    const idCell = existingRow.querySelector('td:first-child');
+                    if (idCell && !idCell.querySelector('.badge-resposta')) {
+                         idCell.innerHTML += ` <span class='badge bg-info badge-resposta'>Nova Resposta</span>`;
+                    }
+
+                    // 3. Atualiza a contagem de mensagens
+                    const msgCell = existingRow.querySelector('td:nth-child(5) .badge');
+                    if(msgCell) msgCell.textContent = ticket.message_count;
+
+                    // 4. Move a linha para o topo da sua tabela para dar visibilidade
+                    const parentTbody = existingRow.parentNode;
+                    parentTbody.prepend(existingRow);
+                }
+            });
+        }
+    }
+
+    // --- LÓGICA DE VERIFICAÇÃO DE ATUALIZAÇÕES ---
+    function triggerUpdateCheck() {
+        // Pega a visão atual (Todos ou Meus) para passar ao script PHP
+        const currentView = new URLSearchParams(window.location.search).get('view') || 'all';
+        
+        fetch(`get_updates_ajax.php?view=${currentView}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.updated_tickets) {
+                    processTicketUpdates(data.updated_tickets);
+                }
+            })
+            .catch(error => console.error("Erro na busca por atualizações de chamados:", error));
+    }
+
+    // Inicia um novo laço de verificação independente, a cada 20 segundos
+    setInterval(triggerUpdateCheck, 20000);
+
     // --- LÓGICA DO RELÓGIO E VERIFICAÇÃO DE E-MAILS ---
     const fetchButton = document.getElementById('email-action-btn');
     const timerDisplay = document.getElementById('fetch-timer');
